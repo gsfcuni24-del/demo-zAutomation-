@@ -1,15 +1,18 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
-import { ArrowLeft, Bot, Layers, Loader2 } from "lucide-react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { ArrowLeft, Loader2 } from "lucide-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { useEffect } from "react";
+import { useCallback, useEffect } from "react";
 
+import { ChatPrompt } from "@/components/chat-prompt";
 import { FileUpload } from "@/components/file-upload";
 import { StatusBadge } from "@/components/status-badge";
 import { TagTree } from "@/components/tag-tree";
-import { PanelPlaceholder, WorkspaceLayout } from "@/components/workspace-layout";
+import { VisualDiff } from "@/components/visual-diff";
+import { WorkspaceLayout } from "@/components/workspace-layout";
+import { useSynthesis } from "@/hooks/use-synthesis";
 import { getLatestUIR, getProject } from "@/lib/api";
 import { queryKeys } from "@/lib/query-keys";
 import { useProjectStore } from "@/stores/project-store";
@@ -29,6 +32,11 @@ export default function ProjectWorkspacePage() {
     queryKey: queryKeys.latestUIR(projectId),
     queryFn: () => getLatestUIR(projectId),
   });
+  const queryClient = useQueryClient();
+  const onSynthesisCompleted = useCallback(() => {
+    void queryClient.invalidateQueries({ queryKey: queryKeys.project(projectId) });
+  }, [queryClient, projectId]);
+  const synthesis = useSynthesis(projectId, onSynthesisCompleted);
 
   useEffect(() => {
     if (projectQuery.data) setActiveProject(projectQuery.data);
@@ -130,18 +138,14 @@ export default function ProjectWorkspacePage() {
     <WorkspaceLayout
       header={header}
       left={left}
-      center={
-        <PanelPlaceholder
-          icon={<Layers className="h-6 w-6" />}
-          title="Visual Diff / HMI Canvas"
-          subtitle="Coming in Phase 3"
-        />
-      }
+      center={<VisualDiff projectId={projectId} latestVersion={snapshot?.version ?? null} />}
       right={
-        <PanelPlaceholder
-          icon={<Bot className="h-6 w-6" />}
-          title="AI Chat Prompt"
-          subtitle="Coming in Phase 3"
+        <ChatPrompt
+          connection={synthesis.connection}
+          mode={synthesis.mode}
+          runs={synthesis.runs}
+          busy={synthesis.busy}
+          onSend={(prompt) => synthesis.send({ prompt })}
         />
       }
     />

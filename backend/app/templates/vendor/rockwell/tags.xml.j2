@@ -1,0 +1,26 @@
+<Tags>
+{% for tag in tags %}
+{% if tag.address %}
+<Tag Name="{{ tag.name }}" TagType="Alias" DataType="{{ tag.data_type.value }}" Radix="{{ tag.data_type | radix }}" AliasFor="{{ tag.address }}" ExternalAccess="Read/Write">
+{% else %}
+<Tag Name="{{ tag.name }}" TagType="Base" DataType="{{ tag.data_type.value }}"{% if tag.data_type.value != "STRING" %} Radix="{{ tag.data_type | radix }}"{% endif %} Constant="false" ExternalAccess="Read/Write">
+{% endif %}
+{% if tag.description %}
+<Description>
+{{ tag.description | cdata }}
+</Description>
+{% endif %}
+{% if not tag.address and tag.initial_value is not none %}
+{% if tag.data_type.value == "STRING" %}
+<Data Format="String" Length="{{ tag.initial_value | string | length }}">
+{{ ("'" ~ tag.initial_value ~ "'") | cdata }}
+</Data>
+{% else %}
+<Data Format="Decorated">
+<DataValue DataType="{{ tag.data_type.value }}" Radix="{{ tag.data_type | radix }}" Value="{{ tag | decorated_value }}"/>
+</Data>
+{% endif %}
+{% endif %}
+</Tag>
+{% endfor %}
+</Tags>

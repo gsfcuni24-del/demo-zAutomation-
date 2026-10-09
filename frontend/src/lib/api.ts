@@ -2,12 +2,15 @@ import axios, { AxiosError, type AxiosInstance } from "axios";
 
 import { env } from "@/lib/env";
 import type {
+  AuditReport,
   FileRead,
   FileUploadResponse,
   HealthResponse,
   ProjectCreate,
   ProjectRead,
+  UIRDiffResponse,
   UIRSnapshotRead,
+  UIRSnapshotSummary,
 } from "@/types/api";
 
 export class ApiError extends Error {
@@ -107,4 +110,33 @@ export async function getLatestUIR(projectId: string): Promise<UIRSnapshotRead |
     if (isNotFound(error)) return null;
     throw error;
   }
+}
+
+export async function listUIRVersions(projectId: string): Promise<UIRSnapshotSummary[]> {
+  const { data } = await apiClient.get<UIRSnapshotSummary[]>(`/projects/${projectId}/uir/versions`);
+  return data;
+}
+
+export async function getUIRDiff(
+  projectId: string,
+  params: { base?: number | null; target?: number | null } = {},
+): Promise<UIRDiffResponse> {
+  const query: Record<string, number> = {};
+  if (params.base != null) query.base = params.base;
+  if (params.target != null) query.target = params.target;
+  const { data } = await apiClient.get<UIRDiffResponse>(`/projects/${projectId}/uir/diff`, {
+    params: query,
+  });
+  return data;
+}
+
+export async function getUIRAudit(projectId: string, version?: number): Promise<AuditReport> {
+  const { data } = await apiClient.get<AuditReport>(`/projects/${projectId}/uir/audit`, {
+    params: version != null ? { version } : {},
+  });
+  return data;
+}
+
+export function exportL5XUrl(projectId: string): string {
+  return `${env.apiUrl}/api/v1/projects/${projectId}/export/l5x`;
 }

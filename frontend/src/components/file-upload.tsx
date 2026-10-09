@@ -1,7 +1,7 @@
 "use client";
 
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { CheckCircle2, FileUp, Loader2, XCircle } from "lucide-react";
+import { AlertTriangle, CheckCircle2, FileUp, Loader2, XCircle } from "lucide-react";
 import { useCallback, useId, useRef, useState, type DragEvent } from "react";
 
 import { uploadProjectFile } from "@/lib/api";
@@ -102,10 +102,20 @@ export function FileUpload({ projectId, onUploaded }: FileUploadProps) {
         </div>
       ) : null}
       {mutation.isSuccess ? (
-        <p className="flex items-center gap-1.5 text-xs text-status-ok">
-          <CheckCircle2 className="h-3.5 w-3.5" />
-          {mutation.data.file.filename} → UIR v{mutation.data.snapshot.version}
-        </p>
+        <div className="space-y-1" data-testid="upload-result">
+          <p className="flex items-center gap-1.5 text-xs text-status-ok">
+            <CheckCircle2 className="h-3.5 w-3.5" />
+            {mutation.data.snapshot
+              ? `${mutation.data.file.filename} → UIR v${mutation.data.snapshot.version}`
+              : `${mutation.data.file.filename} stored — import it via the AI assistant`}
+          </p>
+          {mutation.data.warnings.map((warning) => (
+            <p key={warning} className="flex items-center gap-1.5 text-[11px] text-status-warn">
+              <AlertTriangle className="h-3 w-3 shrink-0" />
+              {warning}
+            </p>
+          ))}
+        </div>
       ) : null}
       {mutation.isError ? (
         <p role="alert" className="flex items-center gap-1.5 text-xs text-status-fault">

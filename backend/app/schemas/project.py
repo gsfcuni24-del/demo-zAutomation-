@@ -7,6 +7,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from app.models import FileParseStatus, ProjectStatus
 from app.schemas.uir import UIRProject
+from app.services.diff_engine import DiffEntry, DiffSummary
 
 
 class ProjectCreate(BaseModel):
@@ -64,4 +65,12 @@ class UIRSnapshotRead(UIRSnapshotSummary):
 
 class FileUploadResponse(BaseModel):
     file: FileRead
-    snapshot: UIRSnapshotSummary
+    snapshot: UIRSnapshotSummary | None
+    warnings: list[str]
+
+
+class UIRDiffResponse(BaseModel):
+    base_version: int | None
+    target_version: int
+    summary: DiffSummary
+    changes: list[DiffEntry]

@@ -1,0 +1,22 @@
+{% if project.screens %}
+<HMIDisplays Source="zAutomation">
+{% for screen in project.screens %}
+<Display ID="{{ screen.id }}" Name="{{ screen.name }}" Width="{{ screen.width }}" Height="{{ screen.height }}">
+{% for w in screen.widgets %}
+<Object ID="{{ w.id }}" Type="{{ w.type.value | capitalize }}" Label="{{ w.label }}" Tag="{{ w.tag_ref }}" X="{{ w.x }}" Y="{{ w.y }}" Width="{{ w.width }}" Height="{{ w.height }}"/>
+{% endfor %}
+</Display>
+{% endfor %}
+</HMIDisplays>
+{% endif %}
+{% if project.alarms %}
+<HMIAlarms>
+{% for alarm in project.alarms %}
+<Alarm ID="{{ alarm.id }}" Tag="{{ alarm.tag_ref }}" Severity="{{ alarm.severity.value }}">
+<Message>
+{{ alarm.message | cdata }}
+</Message>
+</Alarm>
+{% endfor %}
+</HMIAlarms>
+{% endif %}

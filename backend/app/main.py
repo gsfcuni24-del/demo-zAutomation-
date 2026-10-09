@@ -8,6 +8,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.v1.router import api_router
+from app.api.ws.synthesis import router as ws_router
 from app.core.config import settings
 from app.core.logging import configure_logging
 from app.db.session import engine
@@ -42,6 +43,7 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
     app.include_router(api_router, prefix=settings.API_V1_PREFIX)
+    app.include_router(ws_router)
     return app
 
 

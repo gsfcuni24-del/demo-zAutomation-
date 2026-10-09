@@ -1,27 +1,34 @@
 """Project, file upload and UIR snapshot endpoints."""
 
+import re
 import uuid
 from typing import Annotated, Any
 
+import anyio
 import structlog
-from fastapi import APIRouter, HTTPException, UploadFile, status
+from fastapi import APIRouter, HTTPException, Query, Response, UploadFile, status
 from fastapi import File as FileParam
 from sqlmodel import col, select
 
 from app.api.deps import CurrentUserDep, SessionDep, StorageDep
-from app.models import AuditLog, File, FileParseStatus, Project, ProjectStatus, UIRSnapshot, User
+from app.models import AuditLog, File, FileParseStatus, Project, ProjectStatus, User
 from app.models.base import utcnow
 from app.schemas.project import (
     FileRead,
     FileUploadResponse,
     ProjectCreate,
     ProjectRead,
+    UIRDiffResponse,
     UIRSnapshotRead,
     UIRSnapshotSummary,
 )
 from app.schemas.uir import UIRProject
+from app.services.auditor import AuditReport, audit
+from app.services.compilers import CompileError, compile_rockwell_l5x
+from app.services.diff_engine import diff_uir
+from app.services.parsers import ParseError, ParseResult, parse_file, requires_ai_ingestion
+from app.services.snapshots import add_snapshot, get_snapshot, list_snapshots
 from app.services.storage import FileTooLargeError, StorageError
-from app.services.uir import build_mock_uir, hash_uir
 
 router = APIRouter(prefix="/projects", tags=["projects"])
 logger = structlog.get_logger(__name__)
@@ -84,6 +91,7 @@ async def list_project_files(
     "/{project_id}/files",
     response_model=FileUploadResponse,
     status_code=status.HTTP_201_CREATED,
+    responses={422: {"description": "Unsupported, invalid or unsafe file"}},
 )
 async def upload_project_file(
     project_id: uuid.UUID,
@@ -92,6 +100,11 @@ async def upload_project_file(
     user: CurrentUserDep,
     storage: StorageDep,
 ) -> FileUploadResponse:
+    """Store the file and deterministically parse it into a new UIR snapshot.
+
+    L5X/XML and UIR JSON are parsed immediately. CSV/Excel/text inputs are stored as PENDING and
+    turned into UIR by the AI assistant. Parse failures keep a FAILED file record and return 422.
+    """
     # Row lock serialises concurrent uploads so snapshot versions stay gap-free and unique.
     project = await _get_owned_project(session, user, project_id, for_update=True)
     try:
@@ -101,67 +114,79 @@ async def upload_project_file(
     except StorageError as exc:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, str(exc)) from exc
 
+    parsed: ParseResult | None = None
+    parse_error: str | None = None
+    if not requires_ai_ingestion(stored.path):
+        try:
+            parsed = await anyio.to_thread.run_sync(
+                lambda: parse_file(stored.path, source_filename=stored.filename)
+            )
+        except ParseError as exc:
+            parse_error = str(exc)
+
     try:
         file = File(
             project_id=project.id,
             filename=stored.filename,
             local_path=str(stored.path),
             file_size_bytes=stored.size_bytes,
-            parse_status=FileParseStatus.PARSING,
+            parse_status=FileParseStatus.PENDING,
         )
         session.add(file)
-
-        # Phase 2: no real parsing yet; every upload yields a mock UIR snapshot.
-        uir = build_mock_uir(project.name, project.original_vendor, stored.filename)
-        uir_json = uir.model_dump(mode="json")
-        latest = (
-            await session.exec(
-                select(UIRSnapshot)
-                .where(UIRSnapshot.project_id == project.id)
-                .order_by(col(UIRSnapshot.version).desc())
-                .limit(1)
+        snapshot = None
+        metadata: dict[str, Any] = {
+            "file_id": str(file.id),
+            "filename": stored.filename,
+            "size_bytes": stored.size_bytes,
+        }
+        if parse_error is not None:
+            file.parse_status = FileParseStatus.FAILED
+            session.add(
+                _audit(user, project.id, "file.parse_failed", metadata | {"error": parse_error})
             )
-        ).first()
-        snapshot = UIRSnapshot(
-            project_id=project.id,
-            version=(latest.version + 1) if latest else 1,
-            version_hash=hash_uir(uir_json),
-            parent_version_hash=latest.version_hash if latest else None,
-            uir_json=uir_json,
-        )
-        session.add(snapshot)
-
-        file.parse_status = FileParseStatus.SUCCESS
-        project.status = ProjectStatus.READY
-        project.updated_at = utcnow()
-        session.add(project)
-        session.add(
-            _audit(
-                user,
-                project.id,
-                "file.uploaded",
-                {
-                    "file_id": str(file.id),
-                    "filename": stored.filename,
-                    "size_bytes": stored.size_bytes,
-                    "snapshot_version": snapshot.version,
-                },
-            )
-        )
+        else:
+            if parsed is not None:
+                file.parse_status = FileParseStatus.SUCCESS
+                snapshot = await add_snapshot(
+                    session, project.id, parsed.project.model_dump(mode="json")
+                )
+                project.status = ProjectStatus.READY
+                metadata |= {"snapshot_version": snapshot.version, "warnings": parsed.warnings}
+            project.updated_at = utcnow()
+            session.add(project)
+            session.add(_audit(user, project.id, "file.uploaded", metadata))
         await session.commit()
     except BaseException:
         await session.rollback()
         await storage.delete(stored.path)
         raise
 
+    if parse_error is not None:
+        logger.info("file.parse_failed", project_id=str(project.id), error=parse_error)
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_CONTENT, f"Could not parse file: {parse_error}"
+        )
+
     await session.refresh(file)
-    await session.refresh(snapshot)
+    if snapshot is not None:
+        await session.refresh(snapshot)
     logger.info(
-        "file.uploaded", project_id=str(project.id), file_id=str(file.id), version=snapshot.version
+        "file.uploaded",
+        project_id=str(project.id),
+        file_id=str(file.id),
+        version=snapshot.version if snapshot else None,
     )
     return FileUploadResponse(
         file=FileRead.model_validate(file),
-        snapshot=UIRSnapshotSummary.model_validate(snapshot),
+        snapshot=UIRSnapshotSummary.model_validate(snapshot) if snapshot else None,
+        warnings=parsed.warnings if parsed else [],
+    )
+
+
+def _snapshot_read(snapshot: Any) -> UIRSnapshotRead:
+    return UIRSnapshotRead(
+        **UIRSnapshotSummary.model_validate(snapshot).model_dump(),
+        uir=UIRProject.model_validate(snapshot.uir_json),
     )
 
 
@@ -170,17 +195,88 @@ async def get_latest_uir(
     project_id: uuid.UUID, session: SessionDep, user: CurrentUserDep
 ) -> UIRSnapshotRead:
     await _get_owned_project(session, user, project_id)
-    snapshot = (
-        await session.exec(
-            select(UIRSnapshot)
-            .where(UIRSnapshot.project_id == project_id)
-            .order_by(col(UIRSnapshot.version).desc())
-            .limit(1)
-        )
-    ).first()
-    if snapshot is None:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "No UIR snapshot for this project yet")
-    return UIRSnapshotRead(
-        **UIRSnapshotSummary.model_validate(snapshot).model_dump(),
-        uir=UIRProject.model_validate(snapshot.uir_json),
+    return _snapshot_read(await get_snapshot(session, project_id))
+
+
+@router.get("/{project_id}/uir/versions", response_model=list[UIRSnapshotSummary])
+async def list_uir_versions(
+    project_id: uuid.UUID, session: SessionDep, user: CurrentUserDep
+) -> list[UIRSnapshotSummary]:
+    await _get_owned_project(session, user, project_id)
+    return [UIRSnapshotSummary.model_validate(s) for s in await list_snapshots(session, project_id)]
+
+
+@router.get("/{project_id}/uir/diff", response_model=UIRDiffResponse)
+async def diff_uir_versions(
+    project_id: uuid.UUID,
+    session: SessionDep,
+    user: CurrentUserDep,
+    base: Annotated[int | None, Query(ge=1, description="Defaults to target - 1")] = None,
+    target: Annotated[int | None, Query(ge=1, description="Defaults to latest")] = None,
+) -> UIRDiffResponse:
+    """Structured ADDED/REMOVED/MODIFIED changes between two snapshot versions."""
+    await _get_owned_project(session, user, project_id)
+    target_snapshot = await get_snapshot(session, project_id, target)
+    base_version = base if base is not None else target_snapshot.version - 1 or None
+    base_json = (
+        (await get_snapshot(session, project_id, base_version)).uir_json if base_version else None
+    )
+    result = diff_uir(base_json, target_snapshot.uir_json)
+    return UIRDiffResponse(
+        base_version=base_version,
+        target_version=target_snapshot.version,
+        summary=result.summary,
+        changes=result.changes,
+    )
+
+
+@router.get("/{project_id}/uir/audit", response_model=AuditReport)
+async def audit_uir(
+    project_id: uuid.UUID,
+    session: SessionDep,
+    user: CurrentUserDep,
+    version: Annotated[int | None, Query(ge=1)] = None,
+) -> AuditReport:
+    """Run the deterministic safety rules (R-001..R-003) against a snapshot."""
+    await _get_owned_project(session, user, project_id)
+    snapshot = await get_snapshot(session, project_id, version)
+    return audit(snapshot.uir_json)
+
+
+@router.get("/{project_id}/uir/{version}", response_model=UIRSnapshotRead)
+async def get_uir_version(
+    project_id: uuid.UUID, version: int, session: SessionDep, user: CurrentUserDep
+) -> UIRSnapshotRead:
+    await _get_owned_project(session, user, project_id)
+    return _snapshot_read(await get_snapshot(session, project_id, version))
+
+
+_UNSAFE_FILENAME = re.compile(r"[^A-Za-z0-9_-]+")
+
+
+@router.get(
+    "/{project_id}/export/l5x",
+    response_class=Response,
+    responses={200: {"content": {"application/xml": {}}}},
+)
+async def export_l5x(
+    project_id: uuid.UUID,
+    session: SessionDep,
+    user: CurrentUserDep,
+    version: Annotated[int | None, Query(ge=1)] = None,
+) -> Response:
+    """Compile a snapshot into a Rockwell L5X file (deterministic Jinja2, no LLM)."""
+    project = await _get_owned_project(session, user, project_id)
+    snapshot = await get_snapshot(session, project_id, version)
+    try:
+        xml = compile_rockwell_l5x(UIRProject.model_validate(snapshot.uir_json))
+    except CompileError as exc:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, str(exc)) from exc
+    filename = (
+        f"{_UNSAFE_FILENAME.sub('_', project.name).strip('_') or 'project'}_v{snapshot.version}.L5X"
+    )
+    return Response(
+        content=xml,
+        media_type="application/xml",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )

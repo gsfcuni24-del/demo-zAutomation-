@@ -1,0 +1,30 @@
+<Routines>
+{% for routine in routines %}
+<Routine Name="{{ routine.name }}" Type="{{ routine.language.value }}">
+{% if routine.language.value == "ST" %}
+<STContent>
+{% for line in routine.rungs %}
+<Line Number="{{ line.number }}">
+{{ line.logic | cdata }}
+</Line>
+{% endfor %}
+</STContent>
+{% else %}
+<RLLContent>
+{% for rung in routine.rungs %}
+<Rung Number="{{ rung.number }}" Type="N">
+{% if rung.comment %}
+<Comment>
+{{ rung.comment | cdata }}
+</Comment>
+{% endif %}
+<Text>
+{{ rung.logic | rung_text | cdata }}
+</Text>
+</Rung>
+{% endfor %}
+</RLLContent>
+{% endif %}
+</Routine>
+{% endfor %}
+</Routines>

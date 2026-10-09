@@ -19,6 +19,11 @@ class RoutineType(StrEnum):
     SUBROUTINE = "SUBROUTINE"
 
 
+class RoutineLanguage(StrEnum):
+    RLL = "RLL"
+    ST = "ST"
+
+
 class WidgetType(StrEnum):
     BUTTON = "BUTTON"
     INDICATOR = "INDICATOR"

@@ -4,7 +4,14 @@ from typing import Literal, Self
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from app.schemas.uir.enums import AlarmSeverity, RoutineType, TagDataType, TagScope, WidgetType
+from app.schemas.uir.enums import (
+    AlarmSeverity,
+    RoutineLanguage,
+    RoutineType,
+    TagDataType,
+    TagScope,
+    WidgetType,
+)
 
 PLC_IDENTIFIER = r"^[A-Za-z_][A-Za-z0-9_]*$"
 
@@ -49,6 +56,8 @@ class Routine(UIRModel):
     name: str = Field(pattern=PLC_IDENTIFIER)
     program: str
     type: RoutineType
+    language: RoutineLanguage = RoutineLanguage.RLL
+    # RLL: one entry per rung. ST: one entry per source line (number = line number).
     rungs: list[Rung] = Field(default_factory=list)
 
 
