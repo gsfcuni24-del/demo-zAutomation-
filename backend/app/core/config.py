@@ -2,6 +2,7 @@
 
 from enum import StrEnum
 from functools import lru_cache
+from pathlib import Path
 from typing import Annotated, Literal, Self
 
 from pydantic import (
@@ -87,6 +88,12 @@ class Settings(BaseSettings):
     S3_ACCESS_KEY_ID: SecretStr | None = None
     S3_SECRET_ACCESS_KEY: SecretStr | None = None
     MAX_UPLOAD_SIZE_MB: int = Field(default=100, gt=0)
+
+    # --- Local file storage (temporary until S3/MinIO lands) ---
+    UPLOAD_DIR: Path = Path("uploads")
+    ALLOWED_UPLOAD_EXTENSIONS: list[str] = Field(
+        default_factory=lambda: [".xml", ".l5x", ".txt", ".csv", ".xlsx", ".xls", ".json"]
+    )
 
     # --- LLM providers (LiteLLM) ---
     OPENAI_API_KEY: SecretStr | None = None

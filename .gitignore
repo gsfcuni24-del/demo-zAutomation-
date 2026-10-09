@@ -14,6 +14,9 @@ __pycache__/
 htmlcov/
 *.egg-info/
 
+# Local file storage
+backend/uploads/
+
 # Node
 node_modules/
 .next/

@@ -2,6 +2,7 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { Activity, Cpu } from "lucide-react";
+import Link from "next/link";
 
 import { Button } from "@/components/ui/button";
 import { fetchHealth } from "@/lib/api";
@@ -30,7 +31,7 @@ export default function HomePage() {
           <div>
             <h1 className="text-2xl font-semibold tracking-tight">zAutomation Helper AI</h1>
             <p className="font-mono text-xs uppercase tracking-widest text-muted-foreground">
-              {"// system foundation · phase 1"}
+              {"// end-to-end data flow · phase 2"}
             </p>
           </div>
         </div>
@@ -44,8 +45,8 @@ export default function HomePage() {
             {data ? ` · v${data.version} · ${data.environment}` : null}
           </span>
         </div>
-        <Button className="w-full font-mono uppercase tracking-wider" disabled>
-          System access — coming in Phase 6
+        <Button asChild className="w-full font-mono uppercase tracking-wider">
+          <Link href="/dashboard">Open dashboard</Link>
         </Button>
       </section>
     </main>

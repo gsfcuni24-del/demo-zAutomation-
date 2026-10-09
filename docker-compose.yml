@@ -5,9 +5,12 @@ x-backend-common: &backend-common
     context: ./backend
     target: dev
   env_file: .env
+  environment:
+    UPLOAD_DIR: /app/uploads
   volumes:
     - ./backend:/app
     - /app/.venv
+    - uploads_data:/app/uploads
   depends_on:
     postgres:
       condition: service_healthy
@@ -57,7 +60,8 @@ services:
   api:
     <<: *backend-common
     # Re-sync on start: the anonymous .venv volume otherwise keeps stale deps after a rebuild.
-    command: sh -c "uv sync --frozen && uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"
+    # Migrations run before the server starts so the schema is always at head.
+    command: sh -c "uv sync --frozen && alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"
     ports:
       - "127.0.0.1:8000:8000"
     healthcheck:
@@ -90,6 +94,7 @@ services:
         condition: service_healthy
 
 volumes:
+  uploads_data:
   postgres_data:
   redis_data:
   qdrant_data:
