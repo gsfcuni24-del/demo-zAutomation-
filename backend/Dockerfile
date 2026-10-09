@@ -13,6 +13,7 @@ FROM base AS dev
 COPY pyproject.toml uv.lock ./
 RUN uv sync --frozen
 COPY . .
+RUN mkdir -p /app/uploads
 EXPOSE 8000
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
 
@@ -20,7 +21,9 @@ FROM base AS prod
 COPY pyproject.toml uv.lock ./
 RUN uv sync --frozen --no-dev
 COPY app ./app
-RUN useradd --create-home appuser
+COPY alembic ./alembic
+COPY alembic.ini ./
+RUN useradd --create-home appuser && mkdir -p /app/uploads && chown appuser /app/uploads
 USER appuser
 EXPOSE 8000
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "4"]

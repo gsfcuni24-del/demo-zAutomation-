@@ -1,0 +1,276 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<RSLogix5000Content SchemaRevision="1.0" SoftwareRevision="33.01" TargetName="Packaging_Line_3" TargetType="Controller" ContainsContext="false" ExportDate="Fri Oct 09 12:00:00 2026" ExportOptions="NoRawData L5KData DecoratedData ForceProtectedEncoding AllProjDocTrans">
+<Controller Use="Target" Name="Packaging_Line_3" ProcessorType="1769-L33ER" MajorRev="33" MinorRev="11" CommPath="AB_ETHIP-1\192.168.1.10\Backplane\0">
+<Description>
+<![CDATA[Packaging line 3 - infeed conveyor and case erector]]>
+</Description>
+<DataTypes/>
+<Modules/>
+<AddOnInstructionDefinitions/>
+<Tags>
+<Tag Name="Start_PB" TagType="Alias" DataType="BOOL" Radix="Decimal" AliasFor="Local:1:I.Data.0" ExternalAccess="Read/Write">
+<Description>
+<![CDATA[Line start push button]]>
+</Description>
+</Tag>
+<Tag Name="Stop_PB" TagType="Alias" DataType="BOOL" Radix="Decimal" AliasFor="Local:1:I.Data.1" ExternalAccess="Read/Write">
+<Description>
+<![CDATA[Line stop push button (NC)]]>
+</Description>
+</Tag>
+<Tag Name="EStop_OK" TagType="Alias" DataType="BOOL" Radix="Decimal" AliasFor="Local:1:I.Data.2" ExternalAccess="Read/Write">
+<Description>
+<![CDATA[E-stop safety relay healthy]]>
+</Description>
+</Tag>
+<Tag Name="Jam_PE" TagType="Alias" DataType="BOOL" Radix="Decimal" AliasFor="Local:1:I.Data.3" ExternalAccess="Read/Write">
+<Description>
+<![CDATA[Infeed jam photo-eye]]>
+</Description>
+</Tag>
+<Tag Name="Fault_Reset_PB" TagType="Alias" DataType="BOOL" Radix="Decimal" AliasFor="Local:1:I.Data.4" ExternalAccess="Read/Write">
+<Description>
+<![CDATA[Fault reset push button]]>
+</Description>
+</Tag>
+<Tag Name="Conveyor_Motor_Run" TagType="Alias" DataType="BOOL" Radix="Decimal" AliasFor="Local:2:O.Data.0" ExternalAccess="Read/Write">
+<Description>
+<![CDATA[Main conveyor motor contactor]]>
+</Description>
+</Tag>
+<Tag Name="Horn" TagType="Alias" DataType="BOOL" Radix="Decimal" AliasFor="Local:2:O.Data.1" ExternalAccess="Read/Write">
+<Description>
+<![CDATA[Start warning horn]]>
+</Description>
+</Tag>
+<Tag Name="Jam_Detected" TagType="Base" DataType="BOOL" Radix="Decimal" Constant="false" ExternalAccess="Read/Write">
+<Description>
+<![CDATA[Debounced conveyor jam]]>
+</Description>
+<Data Format="L5K">
+<![CDATA[0]]>
+</Data>
+<Data Format="Decorated">
+<DataValue DataType="BOOL" Radix="Decimal" Value="0"/>
+</Data>
+</Tag>
+<Tag Name="Line_Speed" TagType="Base" DataType="REAL" Radix="Float" Constant="false" ExternalAccess="Read/Write">
+<Description>
+<![CDATA[Conveyor speed setpoint (m/min)]]>
+</Description>
+<Data Format="L5K">
+<![CDATA[1.25000000e+001]]>
+</Data>
+<Data Format="Decorated">
+<DataValue DataType="REAL" Radix="Float" Value="12.5"/>
+</Data>
+</Tag>
+<Tag Name="Batch_Count" TagType="Base" DataType="DINT" Radix="Decimal" Constant="false" ExternalAccess="Read/Write">
+<Description>
+<![CDATA[Completed batches]]>
+</Description>
+<Data Format="L5K">
+<![CDATA[0]]>
+</Data>
+<Data Format="Decorated">
+<DataValue DataType="DINT" Radix="Decimal" Value="0"/>
+</Data>
+</Tag>
+<Tag Name="Recipe_Name" TagType="Base" DataType="STRING" Constant="false" ExternalAccess="Read/Write">
+<Description>
+<![CDATA[Active recipe]]>
+</Description>
+<Data Format="String" Length="7">
+<![CDATA['DEFAULT']]>
+</Data>
+</Tag>
+</Tags>
+<Programs>
+<Program Name="MainProgram" TestEdits="false" MainRoutineName="MainRoutine" Disabled="false" UseAsFolder="false">
+<Tags>
+<Tag Name="Run_Request" TagType="Base" DataType="BOOL" Radix="Decimal" Constant="false" ExternalAccess="Read/Write">
+<Description>
+<![CDATA[Operator run request (sealed in)]]>
+</Description>
+<Data Format="Decorated">
+<DataValue DataType="BOOL" Radix="Decimal" Value="0"/>
+</Data>
+</Tag>
+<Tag Name="Seq_Step" TagType="Base" DataType="INT" Radix="Decimal" Constant="false" ExternalAccess="Read/Write">
+<Description>
+<![CDATA[Sequencer step number]]>
+</Description>
+<Data Format="Decorated">
+<DataValue DataType="INT" Radix="Decimal" Value="0"/>
+</Data>
+</Tag>
+<Tag Name="Fault_Code" TagType="Base" DataType="INT" Radix="Decimal" Constant="false" ExternalAccess="Read/Write">
+<Description>
+<![CDATA[Active fault code]]>
+</Description>
+<Data Format="Decorated">
+<DataValue DataType="INT" Radix="Decimal" Value="0"/>
+</Data>
+</Tag>
+<Tag Name="Start_Delay_ms" TagType="Base" DataType="DINT" Radix="Decimal" Constant="false" ExternalAccess="Read/Write">
+<Description>
+<![CDATA[Start warning horn delay]]>
+</Description>
+<Data Format="Decorated">
+<DataValue DataType="DINT" Radix="Decimal" Value="3000"/>
+</Data>
+</Tag>
+<Tag Name="Start_Timer" TagType="Base" DataType="TIMER" Constant="false" ExternalAccess="Read/Write">
+<Description>
+<![CDATA[Start warning timer]]>
+</Description>
+<Data Format="L5K">
+<![CDATA[[0,3000,0]]]>
+</Data>
+</Tag>
+</Tags>
+<Routines>
+<Routine Name="MainRoutine" Type="RLL">
+<RLLContent>
+<Rung Number="0" Type="N">
+<Comment>
+<![CDATA[Run request seal-in with stop and E-stop permissives]]>
+</Comment>
+<Text>
+<![CDATA[BST XIC(Start_PB) NXB XIC(Run_Request) BND XIC(Stop_PB) XIC(EStop_OK) OTE(Run_Request);]]>
+</Text>
+</Rung>
+<Rung Number="1" Type="N">
+<Comment>
+<![CDATA[Start warning delay]]>
+</Comment>
+<Text>
+<![CDATA[XIC(Run_Request) TON(Start_Timer,?,?);]]>
+</Text>
+</Rung>
+<Rung Number="2" Type="N">
+<Comment>
+<![CDATA[Sound horn while start delay is timing]]>
+</Comment>
+<Text>
+<![CDATA[XIC(Run_Request) XIO(Start_Timer.DN) OTE(Horn);]]>
+</Text>
+</Rung>
+<Rung Number="3" Type="N">
+<Comment>
+<![CDATA[Conveyor motor: run after warning, stop on E-stop or jam]]>
+</Comment>
+<Text>
+<![CDATA[XIC(Run_Request) XIC(Start_Timer.DN) XIC(EStop_OK) XIO(Jam_Detected) OTE(Conveyor_Motor_Run);]]>
+</Text>
+</Rung>
+</RLLContent>
+</Routine>
+</Routines>
+</Program>
+<Program Name="Conveyor" TestEdits="false" MainRoutineName="Conveyor_Logic" Disabled="false" UseAsFolder="false">
+<Tags>
+<Tag Name="Jam_Alarm" TagType="Base" DataType="BOOL" Radix="Decimal" Constant="false" ExternalAccess="Read/Write">
+<Description>
+<![CDATA[Latched jam alarm]]>
+</Description>
+<Data Format="Decorated">
+<DataValue DataType="BOOL" Radix="Decimal" Value="0"/>
+</Data>
+</Tag>
+<Tag Name="Belt_Load_Pct" TagType="Base" DataType="REAL" Radix="Float" Constant="false" ExternalAccess="Read/Write">
+<Description>
+<![CDATA[Belt load estimate (%)]]>
+</Description>
+<Data Format="Decorated">
+<DataValue DataType="REAL" Radix="Float" Value="0.0"/>
+</Data>
+</Tag>
+</Tags>
+<Routines>
+<Routine Name="Conveyor_Logic" Type="RLL">
+<RLLContent>
+<Rung Number="0" Type="N">
+<Comment>
+<![CDATA[Jam detection from photo-eye]]>
+</Comment>
+<Text>
+<![CDATA[XIC(Jam_PE) OTE(Jam_Detected);]]>
+</Text>
+</Rung>
+<Rung Number="1" Type="N">
+<Text>
+<![CDATA[XIC(Jam_Detected) OTL(Jam_Alarm);]]>
+</Text>
+</Rung>
+<Rung Number="2" Type="N">
+<Text>
+<![CDATA[XIC(Fault_Reset_PB) XIO(Jam_Detected) OTU(Jam_Alarm);]]>
+</Text>
+</Rung>
+<Rung Number="3" Type="N">
+<Comment>
+<![CDATA[Belt load calculation]]>
+</Comment>
+<Text>
+<![CDATA[JSR(Speed_Calc,0);]]>
+</Text>
+</Rung>
+</RLLContent>
+</Routine>
+<Routine Name="Speed_Calc" Type="ST">
+<STContent>
+<Line Number="0">
+<![CDATA[(* Belt load scaling from line speed *)]]>
+</Line>
+<Line Number="1">
+<![CDATA[IF Conveyor_Motor_Run THEN]]>
+</Line>
+<Line Number="2">
+<![CDATA[    Belt_Load_Pct := Line_Speed * 4.0;]]>
+</Line>
+<Line Number="3">
+<![CDATA[ELSE]]>
+</Line>
+<Line Number="4">
+<![CDATA[    Belt_Load_Pct := 0.0;]]>
+</Line>
+<Line Number="5">
+<![CDATA[END_IF;]]>
+</Line>
+</STContent>
+</Routine>
+</Routines>
+</Program>
+</Programs>
+<Tasks>
+<Task Name="MainTask" Type="CONTINUOUS" Priority="10" Watchdog="500" DisableUpdateOutputs="false" InhibitTask="false">
+<ScheduledPrograms>
+<ScheduledProgram Name="MainProgram"/>
+<ScheduledProgram Name="Conveyor"/>
+</ScheduledPrograms>
+</Task>
+</Tasks>
+<HMIDisplays Source="FactoryTalk View ME">
+<Display ID="scr_overview" Name="Overview" Width="1280" Height="800">
+<Object ID="w_start" Type="Button" Label="Start" Tag="Start_PB" X="40" Y="40" Width="120" Height="48"/>
+<Object ID="w_stop" Type="Button" Label="Stop" Tag="Stop_PB" X="180" Y="40" Width="120" Height="48"/>
+<Object ID="w_run" Type="Indicator" Label="Conveyor Running" Tag="Conveyor_Motor_Run" X="40" Y="120" Width="48" Height="48"/>
+<Object ID="w_speed" Type="Numeric" Label="Line Speed" Tag="Line_Speed" X="180" Y="120" Width="160" Height="48"/>
+<Object ID="w_estop" Type="Indicator" Label="E-Stop OK" Tag="EStop_OK" X="40" Y="200" Width="48" Height="48"/>
+</Display>
+</HMIDisplays>
+<HMIAlarms>
+<Alarm ID="alm_jam" Tag="Jam_Detected" Severity="HIGH">
+<Message>
+<![CDATA[Conveyor jam]]>
+</Message>
+</Alarm>
+<Alarm ID="alm_estop" Tag="EStop_OK" Severity="CRITICAL">
+<Message>
+<![CDATA[E-stop pressed]]>
+</Message>
+</Alarm>
+</HMIAlarms>
+</Controller>
+</RSLogix5000Content>

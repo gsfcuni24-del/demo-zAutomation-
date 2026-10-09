@@ -8,6 +8,12 @@ from app.core.config import Environment, Settings
 STRONG_SECRET = "x" * 40
 
 
+@pytest.fixture(autouse=True)
+def _isolate_env(monkeypatch: pytest.MonkeyPatch) -> None:
+    for name in Settings.model_fields:
+        monkeypatch.delenv(name, raising=False)
+
+
 def make(**overrides: Any) -> Settings:
     return Settings(_env_file=None, **overrides)
 

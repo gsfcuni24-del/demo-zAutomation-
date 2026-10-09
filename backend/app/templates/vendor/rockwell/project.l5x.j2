@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<RSLogix5000Content SchemaRevision="1.0" SoftwareRevision="{{ software_revision }}" TargetName="{{ controller_name }}" TargetType="Controller" ContainsContext="false" ExportDate="{{ export_date }}" ExportOptions="NoRawData L5KData DecoratedData ForceProtectedEncoding AllProjDocTrans">
+<Controller Use="Target" Name="{{ controller_name }}" ProcessorType="{{ processor_type }}" MajorRev="{{ major_rev }}" MinorRev="{{ minor_rev }}">
+<Description>
+{{ project.name | cdata }}
+</Description>
+<DataTypes/>
+<Modules/>
+<AddOnInstructionDefinitions/>
+{% with tags = controller_tags %}{% include "rockwell/tags.xml.j2" %}{% endwith %}
+<Programs>
+{% for program in programs %}
+<Program Name="{{ program.name }}" TestEdits="false"{% if program.main_routine %} MainRoutineName="{{ program.main_routine }}"{% endif %} Disabled="false" UseAsFolder="false">
+{% with tags = program.tags %}{% include "rockwell/tags.xml.j2" %}{% endwith %}
+{% with routines = program.routines %}{% include "rockwell/routines.xml.j2" %}{% endwith %}
+</Program>
+{% endfor %}
+</Programs>
+<Tasks>
+<Task Name="MainTask" Type="CONTINUOUS" Priority="10" Watchdog="500" DisableUpdateOutputs="false" InhibitTask="false">
+<ScheduledPrograms>
+{% for program in programs %}
+<ScheduledProgram Name="{{ program.name }}"/>
+{% endfor %}
+</ScheduledPrograms>
+</Task>
+</Tasks>
+{% include "rockwell/hmi.xml.j2" %}
+</Controller>
+</RSLogix5000Content>
