@@ -30,6 +30,7 @@ UIR_ENUMS: dict[str, type[StrEnum]] = {
     "TAG_DATA_TYPES": uir.TagDataType,
     "TAG_SCOPES": uir.TagScope,
     "ROUTINE_TYPES": uir.RoutineType,
+    "ROUTINE_LANGUAGES": uir.RoutineLanguage,
     "WIDGET_TYPES": uir.WidgetType,
     "ALARM_SEVERITIES": uir.AlarmSeverity,
 }

@@ -10,6 +10,9 @@ export type TagScope = (typeof TAG_SCOPES)[number];
 export const ROUTINE_TYPES = ["MAIN", "SUBROUTINE"] as const;
 export type RoutineType = (typeof ROUTINE_TYPES)[number];
 
+export const ROUTINE_LANGUAGES = ["RLL", "ST"] as const;
+export type RoutineLanguage = (typeof ROUTINE_LANGUAGES)[number];
+
 export const WIDGET_TYPES = ["BUTTON", "INDICATOR", "NUMERIC"] as const;
 export type WidgetType = (typeof WIDGET_TYPES)[number];
 
@@ -38,6 +41,7 @@ export interface Routine {
   name: string;
   program: string;
   type: RoutineType;
+  language: RoutineLanguage;
   rungs: Rung[];
 }
 
