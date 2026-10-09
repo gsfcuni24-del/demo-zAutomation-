@@ -73,7 +73,7 @@ strict = true
 plugins = ["pydantic.mypy"]
 
 [[tool.mypy.overrides]]
-module = ["arq.*", "defusedxml.*", "networkx.*", "aioboto3.*", "lxml.*", "deepdiff.*"]
+module = ["arq.*", "defusedxml.*", "networkx.*", "aioboto3.*", "lxml.*", "deepdiff.*", "litellm.*", "instructor.*", "openpyxl.*"]
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]

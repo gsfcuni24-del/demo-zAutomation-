@@ -31,10 +31,12 @@ class LLMModels(BaseSettings):
 
     model_config = SettingsConfigDict(extra="ignore")
 
-    excel_parser: str = "gpt-4o-mini"
-    tag_namer: str = "gpt-4o-mini"
+    excel_parser: str = "anthropic/claude-3-5-sonnet-20241022"
+    tag_namer: str = "anthropic/claude-3-5-sonnet-20241022"
     logic_drafter: str = "anthropic/claude-3-5-sonnet-20241022"
-    hmi_layout: str = "gpt-4o"
+    hmi_layouter: str = "anthropic/claude-3-5-sonnet-20241022"
+    # Every agent falls back to this model group when its primary model errors out.
+    fallback: str = "gpt-4o"
     embedding: str = "text-embedding-3-small"
 
 
@@ -99,6 +101,9 @@ class Settings(BaseSettings):
     OPENAI_API_KEY: SecretStr | None = None
     ANTHROPIC_API_KEY: SecretStr | None = None
     LLM: LLMModels = Field(default_factory=LLMModels)
+    # auto: use live providers when an API key is configured, otherwise deterministic mock
+    # responses (still routed through LiteLLM + Instructor validation).
+    LLM_MODE: Literal["auto", "live", "mock"] = "auto"
     LLM_TIMEOUT_SECONDS: float = Field(default=120.0, gt=0)
     LLM_MAX_RETRIES: int = Field(default=3, ge=0)
     LOGIC_DRAFTER_MAX_AUDIT_LOOPS: int = Field(default=3, ge=1)
@@ -132,6 +137,12 @@ class Settings(BaseSettings):
     @property
     def cors_origins(self) -> list[str]:
         return [str(origin).rstrip("/") for origin in self.BACKEND_CORS_ORIGINS]
+
+    @property
+    def llm_mock(self) -> bool:
+        if self.LLM_MODE == "auto":
+            return self.OPENAI_API_KEY is None and self.ANTHROPIC_API_KEY is None
+        return self.LLM_MODE == "mock"
 
     @property
     def is_production(self) -> bool:
