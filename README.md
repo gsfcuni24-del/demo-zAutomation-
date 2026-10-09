@@ -50,7 +50,7 @@ docker compose up -d --build
 | Ready    | http://localhost:8000/api/v1/health/ready    |
 | Qdrant   | http://localhost:6333/dashboard              |
 
-Source directories are bind-mounted, so the API, worker and web UI hot-reload when you edit code.
+Source directories are bind-mounted, so the API, worker and web UI hot-reload when you edit code. On start, containers run `uv sync` / `npm install` so dependency changes are picked up after `docker compose up -d --build`. All ports are bound to `127.0.0.1` only.
 
 ```bash
 docker compose logs -f api              # tail logs
@@ -79,6 +79,17 @@ cd frontend
 npm ci
 npm run dev                                     # UI on :3000
 npm run lint && npm run typecheck && npm run build
+```
+
+## Production frontend image
+
+`NEXT_PUBLIC_*` variables are inlined at build time, so pass the public API URL when building:
+
+```bash
+docker build --target prod \
+  --build-arg NEXT_PUBLIC_API_URL=https://api.example.com \
+  --build-arg NEXT_PUBLIC_WS_URL=wss://api.example.com \
+  -t zautomation-web ./frontend
 ```
 
 ## Configuration

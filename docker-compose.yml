@@ -24,7 +24,7 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-zautomation}
       POSTGRES_DB: ${POSTGRES_DB:-zautomation}
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -36,7 +36,7 @@ services:
   redis:
     image: redis:7-alpine
     ports:
-      - "6379:6379"
+      - "127.0.0.1:6379:6379"
     volumes:
       - redis_data:/data
     healthcheck:
@@ -48,17 +48,18 @@ services:
   qdrant:
     image: qdrant/qdrant:v1.15.5
     ports:
-      - "6333:6333"
-      - "6334:6334"
+      - "127.0.0.1:6333:6333"
+      - "127.0.0.1:6334:6334"
     volumes:
       - qdrant_data:/qdrant/storage
 
 
   api:
     <<: *backend-common
-    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    # Re-sync on start: the anonymous .venv volume otherwise keeps stale deps after a rebuild.
+    command: sh -c "uv sync --frozen && uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"
     ports:
-      - "8000:8000"
+      - "127.0.0.1:8000:8000"
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/v1/health')"]
       interval: 10s
@@ -67,17 +68,19 @@ services:
 
   worker:
     <<: *backend-common
-    command: arq app.workers.settings.WorkerSettings --watch app
+    command: sh -c "uv sync --frozen && arq app.workers.settings.WorkerSettings --watch app"
 
   web:
     build:
       context: ./frontend
       target: dev
+    # Re-install on start: the anonymous node_modules volume otherwise keeps stale deps after a rebuild.
+    command: sh -c "npm install --no-audit --no-fund && npm run dev"
     env_file: .env
     environment:
       WATCHPACK_POLLING: "true"
     ports:
-      - "3000:3000"
+      - "127.0.0.1:3000:3000"
     volumes:
       - ./frontend:/app
       - /app/node_modules
