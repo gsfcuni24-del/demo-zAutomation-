@@ -172,5 +172,6 @@ def get_retriever() -> StandardsRetriever:
         url=str(settings.QDRANT_URL),
         api_key=settings.QDRANT_API_KEY.get_secret_value() if settings.QDRANT_API_KEY else None,
         timeout=5,
+        check_compatibility=False,
     )
     return StandardsRetriever(client, embedder, settings.QDRANT_STANDARDS_COLLECTION)

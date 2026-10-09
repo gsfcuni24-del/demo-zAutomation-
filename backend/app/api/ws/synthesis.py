@@ -7,6 +7,7 @@ The last event of each run has ``agent == "orchestrator"`` and ``data.final == t
 """
 
 import uuid
+from pathlib import Path
 from typing import Annotated, Any
 
 import anyio
@@ -63,12 +64,12 @@ async def _load_source(
         if file_id is not None:
             raise ValueError("file not found in this project")
         return None, None
-    path = anyio.Path(file.local_path)
-    if not requires_ai_ingestion(anyio.Path(file.filename)) or not await path.is_file():  # type: ignore[arg-type]
+    path = Path(file.local_path)
+    if not requires_ai_ingestion(Path(file.filename)) or not await anyio.Path(path).is_file():
         if file_id is not None:
             raise ValueError(f"{file.filename} is not a CSV/Excel/text file awaiting ingestion")
         return None, None
-    source = await anyio.to_thread.run_sync(read_tabular, path.as_posix(), file.filename)  # type: ignore[arg-type]
+    source = await anyio.to_thread.run_sync(read_tabular, path, file.filename)
     return file, source
 
 
