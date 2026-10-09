@@ -10,6 +10,8 @@ from pydantic import BaseModel
 from app.models import FileParseStatus, ProjectStatus
 from app.schemas import project as api
 from app.schemas import uir
+from app.services import auditor
+from app.services import diff_engine as diff
 
 TYPES_DIR = Path(__file__).resolve().parents[2] / "frontend" / "src" / "types"
 
@@ -41,10 +43,17 @@ API_MODELS: list[type[BaseModel]] = [
     api.UIRSnapshotSummary,
     api.UIRSnapshotRead,
     api.FileUploadResponse,
+    api.UIRDiffResponse,
+    diff.DiffEntry,
+    diff.DiffSummary,
+    auditor.AuditReport,
+    auditor.Violation,
 ]
 API_ENUMS: dict[str, type[StrEnum]] = {
     "PROJECT_STATUSES": ProjectStatus,
     "FILE_PARSE_STATUSES": FileParseStatus,
+    "CHANGE_TYPES": diff.ChangeType,
+    "VIOLATION_SEVERITIES": auditor.Severity,
 }
 
 _INTERFACE = re.compile(

@@ -15,6 +15,8 @@ from app.db.session import get_session
 from app.main import app
 from app.services.storage import LocalFileStorage, get_storage
 
+TEST_MAX_UPLOAD_BYTES = 256 * 1024
+SAMPLE_L5X = Path(__file__).resolve().parents[1] / "samples" / "test_project.xml"
 TEST_DB_URL = make_url(settings.DATABASE_URL).set(database=f"{settings.POSTGRES_DB}_test")
 
 
@@ -67,7 +69,11 @@ async def api_client(db_engine: AsyncEngine, upload_dir: Path) -> AsyncIterator[
             yield session
 
     def _storage() -> LocalFileStorage:
-        return LocalFileStorage(upload_dir, max_bytes=1024, allowed_extensions=[".xml", ".txt"])
+        return LocalFileStorage(
+            upload_dir,
+            max_bytes=TEST_MAX_UPLOAD_BYTES,
+            allowed_extensions=[".xml", ".l5x", ".txt", ".csv", ".json"],
+        )
 
     app.dependency_overrides[get_session] = _session
     app.dependency_overrides[get_storage] = _storage
